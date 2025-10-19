@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTubeタイムスタンプ共有ツール</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background-color: #f5f5f5;
+      margin: 0;
+      padding: 0;
+      color: #333;
+    }
+    .container {
+      max-width: 600px;
+      width: 90%;
+      margin: 40px auto;
+      padding: 20px;
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 24px;
+    }
+    label {
+      display: block;
+      margin-top: 15px;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 14px;
+    }
+    .time-inputs {
+      display: flex;
+      gap: 8px;
+    }
+    .time-inputs input {
+      flex: 1;
+    }
+    button.generate {
+      display: block;
+      width: 100%;
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button.generate:hover {
+      background-color: #45a049;
+    }
+    #result {
+      margin-top: 25px;
+      display: none;
+      padding: 15px;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      background-color: #fafafa;
+    }
+    #result a {
+      word-break: break-all;
+      color: #1a0dab;
+    }
+    .share-buttons {
+      margin-top: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .share-buttons button {
+      flex: 1 1 calc(50% - 10px);
+      min-width: 100px;
+      padding: 8px;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .share-line { background-color: #00c300; }
+    .share-line:hover { background-color: #00a900; }
+    .share-twitter { background-color: #1da1f2; }
+    .share-twitter:hover { background-color: #0d8adf; }
+    .share-instagram { background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%);
+      color: white; }
+    .share-discord { background-color: #5865F2; }
+    .share-discord:hover { background-color: #4752C4; }
+    .share-instagram:hover {
+      filter: brightness(1.1);
+    }
+    .notice {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #555;
+    }
+
+    /* スマホ向けレイアウト調整 */
+    @media (max-width: 480px) {
+      h1 {
+        font-size: 20px;
+      }
+      .container {
+        margin: 20px auto;
+        padding: 15px;
+      }
+      .time-inputs {
+        flex-direction: column;
+      }
+      .share-buttons {
+        flex-direction: column;
+        gap: 8px;
+      }
+      .share-buttons button {
+        flex: 1 1 auto;
+        width: 100%;
+        font-size: 16px;
+        padding: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>YouTubeタイムスタンプ共有ツール</h1>
+    <p>このツールでは、YouTubeのリンクと再生開始時間（時・分・秒）を入力すると、その時間から再生するリンクを生成し、LINE・X（旧Twitter）・Instagram・Discordで共有できます。</p>
+    <label for="youtubeUrl">YouTubeリンク</label>
+    <input type="text" id="youtubeUrl" placeholder="YouTubeのURLを入力してください">
+    <label>開始時間</label>
+    <div class="time-inputs">
+      <input type="number" id="hours" min="0" placeholder="時">
+      <input type="number" id="minutes" min="0" max="59" placeholder="分">
+      <input type="number" id="seconds" min="0" max="59" placeholder="秒">
+    </div>
+    <button class="generate" onclick="generateLink()">リンクを生成</button>
+
+    <div id="result">
+      <p><strong>生成されたリンク：</strong> <a id="generatedLink" href="#" target="_blank"></a></p>
+      <div class="share-buttons">
+        <button class="share-line" onclick="shareLine()">LINEで共有</button>
+        <button class="share-twitter" onclick="shareTwitter()">Xで共有</button>
+        <button class="share-instagram" onclick="shareInstagram()">Instagramで共有</button>
+        <button class="share-discord" onclick="shareDiscord()">Discordで共有</button>
+      </div>
+      <div class="notice" id="copyNotice" style="display: none;"></div>
+    </div>
+  </div>
+
+  <script>
+    function generateLink() {
+      const urlInput = document.getElementById('youtubeUrl').value.trim();
+      const h = parseInt(document.getElementById('hours').value) || 0;
+      const m = parseInt(document.getElementById('minutes').value) || 0;
+      const s = parseInt(document.getElementById('seconds').value) || 0;
+      const total = h * 3600 + m * 60 + s;
+      if (!urlInput) {
+        alert('YouTubeのURLを入力してください');
+        return;
+      }
+      if (total < 0) {
+        alert('時間は0以上を入力してください');
+        return;
+      }
+      // Remove existing time parameters
+      let newUrl;
+      try {
+        const urlObj = new URL(urlInput);
+        urlObj.searchParams.delete('t');
+        urlObj.searchParams.delete('start');
+        newUrl = urlObj.toString();
+      } catch (e) {
+        // If invalid URL, try to prepend https
+        try {
+          const urlObj2 = new URL('https://' + urlInput);
+          urlObj2.searchParams.delete('t');
+          urlObj2.searchParams.delete('start');
+          newUrl = urlObj2.toString();
+        } catch (e2) {
+          alert('有効なYouTube URLを入力してください');
+          return;
+        }
+      }
+      // Append the timestamp
+      let separator = newUrl.includes('?') ? '&' : '?';
+      const timestampedUrl = newUrl + separator + 't=' + total + 's';
+
+      const linkEl = document.getElementById('generatedLink');
+      linkEl.href = timestampedUrl;
+      linkEl.textContent = timestampedUrl;
+      document.getElementById('result').style.display = 'block';
+      // Hide any previous copy notice
+      document.getElementById('copyNotice').style.display = 'none';
+    }
+
+    function getGeneratedUrl() {
+      const linkEl = document.getElementById('generatedLink');
+      return linkEl.href;
+    }
+
+    function shareTwitter() {
+      const url = getGeneratedUrl();
+      if (!url) {
+        alert('まずリンクを生成してください');
+        return;
+      }
+      const text = encodeURIComponent('この動画をチェックしてください');
+      const shareUrl = 'https://twitter.com/intent/tweet?url=' + encodeURIComponent(url) + '&text=' + text;
+      window.open(shareUrl, '_blank');
+    }
+
+    function shareLine() {
+      const url = getGeneratedUrl();
+      if (!url) {
+        alert('まずリンクを生成してください');
+        return;
+      }
+      const text = encodeURIComponent('この動画をチェックしてください');
+      const shareUrl = 'https://social-plugins.line.me/lineit/share?url=' + encodeURIComponent(url) + '&text=' + text;
+      window.open(shareUrl, '_blank');
+    }
+
+    async function copyToClipboard(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (err) {
+        return false;
+      }
+    }
+
+    function showCopyNotice(message) {
+      const notice = document.getElementById('copyNotice');
+      notice.textContent = message;
+      notice.style.display = 'block';
+    }
+
+    function shareInstagram() {
+      const url = getGeneratedUrl();
+      if (!url) {
+        alert('まずリンクを生成してください');
+        return;
+      }
+      const data = {
+        title: 'YouTube動画',
+        text: 'この動画をチェックしてください',
+        url: url
+      };
+      if (navigator.share) {
+        navigator.share(data).catch(() => {
+          // Fallback to copy
+          copyToClipboard(url).then(() => {
+            showCopyNotice('共有APIが利用できないため、リンクをクリップボードにコピーしました。Instagramアプリで貼り付けてください。');
+          });
+        });
+      } else {
+        copyToClipboard(url).then(() => {
+          showCopyNotice('Instagramでは直接リンクを送れないため、リンクをクリップボードにコピーしました。ストーリーやプロフィールに貼り付けてください。');
+        });
+      }
+    }
+
+    function shareDiscord() {
+      const url = getGeneratedUrl();
+      if (!url) {
+        alert('まずリンクを生成してください');
+        return;
+      }
+      const data = {
+        title: 'YouTube動画',
+        text: 'この動画をチェックしてください',
+        url: url
+      };
+      if (navigator.share) {
+        navigator.share(data).catch(() => {
+          copyToClipboard(url).then(() => {
+            showCopyNotice('共有APIが利用できないため、リンクをクリップボードにコピーしました。Discordで貼り付けてください。');
+          });
+        });
+      } else {
+        copyToClipboard(url).then(() => {
+          showCopyNotice('Discordでは専用の共有URLが用意されていないため、リンクをクリップボードにコピーしました。チャットに貼り付けてください。');
+        });
+      }
+    }
+  </script>
+</body>
+</html>
